@@ -2,7 +2,9 @@
 let database = {
   users: {},
   articles: {},
-  nextArticleId: 1
+  comments: {},
+  nextArticleId: 1,
+  nextCommentId: 1,
 };
 
 const routes = {
@@ -26,8 +28,33 @@ const routes = {
   },
   '/articles/:id/downvote': {
     'PUT': downvoteArticle
+  },
+  '/comments': {
+    'POST': createComment
+  },
+  '/comments/:id': {
+    'PUT': updateComment,
+    'DELETE': deleteComment
+  },
+  '/comments/:id/upvote': {
+    'PUT': upvoteComment
   }
 };
+
+function upvoteComment(url, request) {
+  const id = url.split('/').filter(segment => segment)[1];
+  const requestUsername = request.body && request.body.username;
+  const response = {};
+  let savedComment = database.comments[id];
+  if (id && requestUsername && savedComment && database.users[requestUsername]) {
+    savedComment = upvote(savedComment, requestUsername);
+    response.status = 200;
+    response.body = {comment: savedComment};
+  } else {
+    response.status = 400;
+  }
+  return response;
+}
 
 function getUser(url, request) {
   const username = url.split('/').filter(segment => segment)[1];
@@ -112,6 +139,52 @@ function getArticle(url, request) {
   return response;
 }
 
+function createComment(url, request) {
+  const requestComment = request.body && request.body.comment;
+  const response = {};
+  
+  if (requestComment && requestComment.body && requestComment.articleId && requestComment.username && 
+    database.users[requestComment.username] && database.articles[requestComment.articleId]) {
+    const comment = {
+      id: database.nextCommentId++,
+      body: requestComment.body,
+      username: requestComment.username,
+      articleId: requestComment.articleId,
+      upvotedBy: [],
+      downvotedBy: [],
+    };
+    // add to article commentIds
+    database.articles[requestComment.articleId].commentIds.push(comment.id);
+    // add to comments
+    database.comments[comment.id] = comment;
+    // add to user commentIds
+    database.users[requestComment.username].commentIds.push(comment.id);
+    // construct response
+    response.body = {comment: comment};
+    response.status = 201;
+  } else {
+    response.status = 400;
+  }
+  return response;
+}
+
+function updateComment(url, request) {
+  const id = Number(url.split('/')[2]);
+  const savedComment = database.comments[id];
+  const requestComment = request.body && request.body.comment;
+  const response = {};
+  if (!id || !requestComment) {
+    response.status = 400;
+  } else if (!savedComment) {
+    response.status = 404;
+  } else {
+    savedComment.body = requestComment.body || savedComment.body;
+    response.body = {comment: savedComment};
+    response.status = 200;
+  }
+  return response;
+}
+
 function createArticle(url, request) {
   const requestArticle = request.body && request.body.article;
   const response = {};
@@ -158,6 +231,26 @@ function updateArticle(url, request) {
     response.status = 200;
   }
 
+  return response;
+}
+
+function deleteComment(url, request) {
+  const id = Number(url.split('/').filter(segment => segment)[1]);
+  const savedComment = database.comments[id];
+  const response = {};
+
+  if (savedComment) {
+    const arrUserCommentIds = database.users[savedComment.username].commentIds;
+    let index = arrUserCommentIds.indexOf(id);
+    arrUserCommentIds.splice(index, 1);
+    const arrArticleCommentIds = database.articles[savedComment.articleId].commentIds;
+    let index0 = arrArticleCommentIds.indexOf(id);
+    arrArticleCommentIds.splice(index0, 1);
+    database.comments[id] = null;
+    response.status = 204;
+  } else if (!id || !savedComment) {
+    response.status = 404;
+  }
   return response;
 }
 
