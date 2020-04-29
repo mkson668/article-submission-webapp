@@ -1,0 +1,33 @@
+users:
+  mmmm:
+    username: mmmm
+    articleIds: []
+    commentIds: []
+  abcd:
+    username: abcd
+    articleIds:
+      - 1
+    commentIds:
+      - 1
+articles:
+  '1':
+    id: 1
+    title: musinsa
+    url: 'https://store.musinsa.com/app/product/detail/826637/0'
+    username: abcd
+    commentIds:
+      - 1
+    upvotedBy:
+      - abcd
+    downvotedBy: []
+    comments: []
+comments:
+  '1':
+    id: 1
+    body: great stuff
+    username: abcd
+    articleId: 1
+    upvotedBy: []
+    downvotedBy: []
+nextArticleId: 2
+nextCommentId: 2

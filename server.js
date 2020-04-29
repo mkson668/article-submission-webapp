@@ -1,3 +1,6 @@
+const fs = require('fs');
+const yaml = require('js-yaml');
+
 // database is let instead of const to allow us to modify it in test.js
 let database = {
   users: {},
@@ -38,8 +41,26 @@ const routes = {
   },
   '/comments/:id/upvote': {
     'PUT': upvoteComment
+  },
+  '/comments/:id/downvote': {
+    'PUT': downvoteComment
   }
 };
+
+function downvoteComment(url, request) {
+  const id = url.split('/').filter(segment => segment)[1];
+  const requestUsername = request.body && request.body.username;
+  const response = {};
+  let savedComment = database.comments[id];
+  if (id && requestUsername && savedComment && database.users[requestUsername]) {
+    savedComment = downvote(savedComment, requestUsername);
+    response.status = 200;
+    response.body = {comment: savedComment};
+  } else {
+    response.status = 400;
+  }
+  return response;
+}
 
 function upvoteComment(url, request) {
   const id = url.split('/').filter(segment => segment)[1];
@@ -367,9 +388,11 @@ const requestHandler = (request, response) => {
     return response.end();
   }
 
+
+// !isTestMode && (typeof saveDatabase === 'function') && saveDatabase();
   if (method === 'GET' || method === 'DELETE') {
     const methodResponse = routes[route][method].call(null, url);
-    !isTestMode && (typeof saveDatabase === 'function') && saveDatabase();
+    (typeof saveDatabase === 'function') && saveDatabase();
 
     response.statusCode = methodResponse.status;
     response.end(JSON.stringify(methodResponse.body) || '');
@@ -403,7 +426,51 @@ const getRequestRoute = (url) => {
   }
 }
 
-if (typeof loadDatabase === 'function' && !isTestMode) {
+function loadDatabase() {
+  let yamlParsed;
+  try {
+    if (fs.existsSync('./data.yaml')) {
+      try {
+        var doc = yaml.safeLoad(fs.readFileSync('./data.yaml', 'utf8'));
+        console.log(doc);
+        yamlParsed = doc;
+      } catch (e) {
+        console.log('yaml safeLoad error: ' + e);
+      }
+    } else {
+      let newDatabase = {
+        users: {},
+        articles: {},
+        comments: {},
+        nextArticleId: 1,
+        nextCommentId: 1,
+      };
+      yamlParsed = newDatabase;
+      try {
+        let yamlDBStr = yaml.dump(newDatabase);
+        fs.writeFileSync('./data.yaml', yamlDBStr);
+      } catch (err) {
+        console.error('writefilesync or dump error: ' + err);
+      }
+    }
+  } catch (err) {
+    console.error('database existSync load error: ' + err);
+  }
+  return yamlParsed;
+}
+
+function saveDatabase() {
+  try {
+    let yamlDBStr = yaml.dump(database);
+    fs.writeFileSync('./data.yaml', yamlDBStr);
+    console.log('database successfully saved');
+  } catch (err) {
+    console.log('writefilesync error: ' + err);
+  }
+}
+
+// typeof loadDatabase === 'function' && !isTestMode
+if (typeof loadDatabase === 'function') {
   const savedDatabase = loadDatabase();
   if (savedDatabase) {
     for (key in database) {
